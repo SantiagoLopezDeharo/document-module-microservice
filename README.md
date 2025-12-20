@@ -2,6 +2,7 @@
 
 A high-performance Go web service for transforming data payloads between various formats (JSON, XML, CSV, TSV, TOML, XLSX). Designed for heavy data processing pipelines.
 
+Also has built in Documents (pdf, docx, excel) generation functionality that ensures a very high performance and reliability.
 
 ## 🛠️ Tech Stack
 
@@ -20,9 +21,15 @@ A high-performance Go web service for transforming data payloads between various
 
 ## Usage
 
-### Endpoint
+### Endpoints
 
+#### Data Conversion
 `POST /convert`
+
+#### Document Generation
+- `POST /convert/pdf`: Generates a PDF file from the JSON body.
+- `POST /convert/docx`: Generates a DOCX file from the JSON body.
+- `POST /convert/xlsx`: Generates an XLSX file from the JSON body.
 
 ### Specifying Formats
 
@@ -67,6 +74,158 @@ curl -X POST "http://localhost:8080/convert" \
 | MsgPack| `msgpack`         | `application/msgpack`        |
 | XLSX   | `xlsx`            | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` |
 | Properties | `properties`  | `text/x-java-properties`     |
+
+### Document Generation Examples
+
+The service uses the following libraries for document generation. Please refer to their documentation for advanced usage and expected data structures.
+
+- **PDF**: [go-pdf/fpdf](https://github.com/go-pdf/fpdf) - A library for generating PDF files.
+- **DOCX**: [gingfrederik/docx](https://github.com/gingfrederik/docx) - A library for generating DOCX files.
+- **XLSX**: [xuri/excelize](https://github.com/xuri/excelize) - A library for generating XLSX files.
+
+**Expected JSON Structure (DOCX)**
+
+The DOCX generation endpoint accepts a list of actions to construct the document.
+
+```json
+{
+  "actions": [
+    { "type": "AddParagraph" },
+    { "type": "AddText", "txt": "My Title", "size": 48, "bold": true, "color": "0000FF" },
+    { "type": "AddParagraph" },
+    { "type": "AddText", "txt": "Some regular text.", "size": 24 }
+  ]
+}
+```
+
+**Supported DOCX Actions**: `AddParagraph`, `AddText`.
+**Supported Text Properties**: `txt`, `size`, `color` (hex), `bold`, `italic`.
+
+**Expected JSON Structure (XLSX)**
+
+The XLSX generation endpoint accepts a list of actions to construct the spreadsheet.
+
+```json
+{
+  "actions": [
+    { "type": "NewSheet", "sheet": "Sheet2" },
+    { "type": "SetActiveSheet", "sheet": "Sheet1" },
+    { "type": "SetCellValue", "sheet": "Sheet1", "axis": "A1", "value": "Hello Excel" },
+    { 
+      "type": "NewStyle", 
+      "style_ref": "headerStyle", 
+      "style": { 
+        "font": { "bold": true, "size": 14 }, 
+        "fill": { "type": "pattern", "color": ["#CCCCCC"], "pattern": 1 } 
+      } 
+    },
+    { "type": "SetCellStyle", "sheet": "Sheet1", "h_cell": "A1", "v_cell": "A1", "style_ref": "headerStyle" }
+  ]
+}
+```
+
+**Supported XLSX Actions**: `NewSheet`, `SetActiveSheet`, `SetCellValue`, `SetColWidth`, `SetRowHeight`, `MergeCell`, `NewStyle`, `SetCellStyle`.
+
+**Generate PDF**
+
+The PDF generation endpoint accepts a list of commands to construct the PDF dynamically.
+
+```json
+{
+  "orientation": "P",
+  "unit": "mm",
+  "size": "A4",
+  "actions": [
+    {"type": "AddPage"},
+    {"type": "SetFont", "family": "Arial", "style": "B", "size": 16},
+    {"type": "Cell", "w": 0, "h": 10, "txt": "My Title", "ln": 1, "align": "C"},
+    {"type": "SetFont", "family": "Arial", "style": "", "size": 12},
+    {"type": "MultiCell", "w": 0, "h": 10, "txt": "Long content goes here...", "align": "L"}
+  ]
+}
+```
+
+**Supported PDF Actions**: `AddPage`, `SetFont`, `Cell`, `MultiCell`, `Ln`, `SetTextColor`, `SetDrawColor`, `SetFillColor`.
+
+**Generate PDF**
+
+```bash
+curl -X POST "http://localhost:8080/convert/pdf" \
+     -H "Content-Type: application/json" \
+     -d @pdf_request.json \
+     --output output.pdf
+```
+
+**Generate DOCX**
+
+```bash
+curl -X POST "http://localhost:8080/convert/docx" \
+     -H "Content-Type: application/json" \
+     -d @docx_request.json \
+     --output output.docx
+```
+
+**Generate XLSX**
+
+```bash
+curl -X POST "http://localhost:8080/convert/xlsx" \
+     -H "Content-Type: application/json" \
+     -d @xlsx_request.json \
+     --output output.xlsx
+```
+
+We can generate really complex documents using this, for example the following JSON generates a really complex and rich pdf document:
+```json
+{
+  "orientation": "P",
+  "unit": "mm",
+  "size": "A4",
+  "actions": [
+    { "type": "AddPage" },
+    
+    { "type": "SetTextColor", "r": 200, "g": 200, "b": 200 },
+    { "type": "SetFont", "family": "Arial", "style": "B", "size": 50 },
+    { "type": "SetXY", "x": 80, "y": 10 },
+    { "type": "Cell", "w": 0, "h": 20, "txt": "DRAFT", "align": "R" },
+
+    { "type": "SetTextColor", "r": 0, "g": 0, "b": 0 },
+    { "type": "SetXY", "x": 10, "y": 10 },
+
+    { "type": "SetFont", "family": "Arial", "style": "B", "size": 24 },
+    { "type": "Cell", "w": 0, "h": 20, "txt": "Complex PDF Report", "ln": 1, "align": "C" },
+    { "type": "Ln", "h": 10 },
+
+    { "type": "SetFont", "family": "Arial", "style": "", "size": 12 },
+    { "type": "MultiCell", "w": 0, "h": 6, "txt": "This document demonstrates the capabilities of the PDF generation endpoint. It includes a watermark, a table of data, and mathematical symbols.", "align": "L" },
+    { "type": "Ln", "h": 10 },
+
+    { "type": "SetFont", "family": "Arial", "style": "B", "size": 14 },
+    { "type": "Cell", "w": 0, "h": 10, "txt": "Data Table", "ln": 1 },
+    { "type": "SetFont", "family": "Arial", "style": "B", "size": 12 },
+    { "type": "SetFillColor", "r": 240, "g": 240, "b": 240 },
+    { "type": "Cell", "w": 40, "h": 10, "txt": "ID", "border": "1", "align": "C" },
+    { "type": "Cell", "w": 80, "h": 10, "txt": "Name", "border": "1", "align": "C" },
+    { "type": "Cell", "w": 40, "h": 10, "txt": "Value", "border": "1", "ln": 1, "align": "C" },
+
+    { "type": "SetFont", "family": "Arial", "style": "", "size": 12 },
+    { "type": "Cell", "w": 40, "h": 10, "txt": "1", "border": "1", "align": "C" },
+    { "type": "Cell", "w": 80, "h": 10, "txt": "Item Alpha", "border": "1", "align": "L" },
+    { "type": "Cell", "w": 40, "h": 10, "txt": "100.50", "border": "1", "ln": 1, "align": "R" },
+    { "type": "Cell", "w": 40, "h": 10, "txt": "2", "border": "1", "align": "C" },
+    { "type": "Cell", "w": 80, "h": 10, "txt": "Item Beta", "border": "1", "align": "L" },
+    { "type": "Cell", "w": 40, "h": 10, "txt": "250.00", "border": "1", "ln": 1, "align": "R" },
+    { "type": "Ln", "h": 10 },
+
+    { "type": "SetFont", "family": "Arial", "style": "B", "size": 14 },
+    { "type": "Cell", "w": 0, "h": 10, "txt": "Mathematical Symbols", "ln": 1 },
+    { "type": "SetFont", "family": "Arial", "style": "", "size": 12 },
+    { "type": "Cell", "w": 0, "h": 10, "txt": "Here are some math symbols using the Symbol font:", "ln": 1 },
+    
+    { "type": "SetFont", "family": "Symbol", "style": "", "size": 16 },
+    { "type": "Cell", "w": 0, "h": 10, "txt": "S x = lim (1 + 1/n)^n", "ln": 1 }
+  ]
+}
+```
 
 ### Data Structure Assumptions
 
