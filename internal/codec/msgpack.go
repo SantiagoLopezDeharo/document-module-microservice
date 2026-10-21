@@ -13,7 +13,7 @@ func (c *msgpackCodec) Decode(r io.Reader) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := checkMsgpackDepth(b); err != nil {
+	if err := checkMsgpack(b); err != nil {
 		return nil, err
 	}
 	var data interface{}

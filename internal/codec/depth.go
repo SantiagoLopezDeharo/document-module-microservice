@@ -125,18 +125,27 @@ func skipTOMLString(data []byte, i int) int {
 	return len(data)
 }
 
-var errTruncated = errors.New("truncated")
+var (
+	errTruncated   = errors.New("invalid msgpack: truncated document")
+	errOverclaimed = errors.New("invalid msgpack: container declares more items than the document holds")
+)
 
-// checkMsgpackDepth walks the encoding iteratively, tracking how many items
-// each open array or map still expects.
-func checkMsgpackDepth(data []byte) error {
+// checkMsgpack validates the whole encoding iteratively before decoding,
+// tracking how many items each open array or map still expects. Besides
+// bounding nesting, it rejects headers that claim more items or bytes than the
+// body contains: the decoder pre-allocates from the declared length, so the
+// five bytes "dd ff ff ff ff" used to allocate 64 GB.
+func checkMsgpack(data []byte) error {
 	var pending []uint64
 	for i := 0; i < len(data); {
 		items, next, err := msgpackItem(data, i)
 		if err != nil {
-			return nil
+			return err
 		}
 		i = next
+		if items > uint64(len(data)-i) {
+			return errOverclaimed
+		}
 		if items > 0 {
 			if pending = append(pending, items); len(pending) > MaxDepth {
 				return ErrTooDeep
@@ -150,6 +159,9 @@ func checkMsgpackDepth(data []byte) error {
 			}
 			pending = pending[:len(pending)-1]
 		}
+	}
+	if len(pending) > 0 {
+		return errTruncated
 	}
 	return nil
 }
