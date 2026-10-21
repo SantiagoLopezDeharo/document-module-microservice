@@ -2,7 +2,9 @@ package codec
 
 import (
 	"bytes"
+	"encoding/xml"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -115,6 +117,82 @@ func TestXMLNestingIgnoresMarkupInText(t *testing.T) {
 	}
 	if err := checkXMLDepth([]byte(strings.Repeat("<a x='1'>", deep))); !errors.Is(err, ErrTooDeep) {
 		t.Errorf("unclosed deep elements: err = %v", err)
+	}
+}
+
+// referenceXMLDepth is the deepest nesting a strict encoding/xml decoder, as
+// used by mxj, reaches before the document ends or turns invalid.
+func referenceXMLDepth(data []byte) int {
+	dec := xml.NewDecoder(bytes.NewReader(data))
+	depth, deepest := 0, 0
+	for {
+		tok, err := dec.RawToken()
+		if err != nil {
+			return deepest
+		}
+		switch tok.(type) {
+		case xml.StartElement:
+			depth++
+			deepest = max(deepest, depth)
+		case xml.EndElement:
+			depth--
+		}
+	}
+}
+
+func TestXMLDepthScannerMatchesDecoder(t *testing.T) {
+	docs := []string{
+		`<a><b><c/></b></a>`,
+		`<a x="1" y='2'><b z="/>"><c/><d></d></b></a>`,
+		`<?xml version="1.0"?><!-- <x><y><z> --><a><![CDATA[<b><c><d>]]><e/></a>`,
+		`<!DOCTYPE a [<!ELEMENT a (b)><!ATTLIST a x CDATA "<q>">]><a><b/></a>`,
+		`<a><b><c></c></b><b><c><d/></c></b></a>`,
+		`<ns:a xmlns:ns="u"><ns:b/></ns:a>`,
+		`<a>text > more <b>x</b></a>`,
+		`<a><b attr="unterminated></b></a>`,
+		`<a/><b/><c/>`,
+		`<a><b><c>`,
+		`<A><A><!"00000000><A>`,
+		`<!DOCTYPE x [<!-- " -->]><a><b><c/></b></a>`,
+		`<!DOCTYPE x [<!ENTITY e '>'>]><a><b/></a>`,
+		`<!x<!-y><a><b/></a>`,
+	}
+	for _, doc := range docs {
+		want := referenceXMLDepth([]byte(doc))
+		for limit := 0; limit <= 4; limit++ {
+			if want > limit && !xmlDepthExceeds([]byte(doc), limit) {
+				t.Errorf("%s: decoder reaches depth %d but scanner passes limit %d", doc, want, limit)
+			}
+		}
+		if exceeded := xmlDepthExceeds([]byte(doc), 3); exceeded && want <= 3 && !strings.Contains(doc, "unterminated") && !strings.HasSuffix(doc, "<c>") {
+			t.Errorf("%s: scanner over-counts a well-formed document (depth %d)", doc, want)
+		}
+	}
+}
+
+func FuzzXMLDepthNeverUnderCounts(f *testing.F) {
+	for _, seed := range []string{`<a><b x="1"/><c><![CDATA[<d>]]></c></a>`, `<!DOCTYPE x [<!ENTITY e "v">]><x><y/></x>`, `<?p?><!--c--><a><b><c/></b></a>`} {
+		f.Add([]byte(seed))
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if depth := referenceXMLDepth(data); depth > 2 && !xmlDepthExceeds(data, 2) {
+			t.Fatalf("decoder reaches depth %d, scanner allows it under limit 2: %q", depth, data)
+		}
+	})
+}
+
+func BenchmarkXMLDepthCheck(b *testing.B) {
+	var doc bytes.Buffer
+	doc.WriteString("<doc>")
+	for i := range 30000 {
+		fmt.Fprintf(&doc, `<List><id>%d</id><name attr="x">User %d</name><email>u%d@example.com</email></List>`, i, i, i)
+	}
+	doc.WriteString("</doc>")
+	data := doc.Bytes()
+	b.SetBytes(int64(len(data)))
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = checkXMLDepth(data)
 	}
 }
 

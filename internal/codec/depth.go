@@ -3,7 +3,6 @@ package codec
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"strings"
@@ -16,26 +15,106 @@ const MaxDepth = 10_000
 
 var ErrTooDeep = fmt.Errorf("document nesting exceeds %d levels", MaxDepth)
 
-// checkXMLDepth stops at the first syntax error and lets the real decoder
-// report it.
 func checkXMLDepth(data []byte) error {
-	dec := xml.NewDecoder(bytes.NewReader(data))
-	dec.Strict = false
+	if xmlDepthExceeds(data, MaxDepth) {
+		return ErrTooDeep
+	}
+	return nil
+}
+
+// xmlDepthExceeds scans markup without tokenizing it, skipping comments,
+// CDATA, processing instructions and directives. mxj parses with a strict
+// encoding/xml decoder, so attribute values are always quoted and "/>" always
+// means a self-closing tag. Unterminated constructs end the scan and are left
+// for the decoder to reject.
+func xmlDepthExceeds(data []byte, limit int) bool {
 	depth := 0
-	for {
-		tok, err := dec.RawToken()
-		if err != nil {
-			return nil
+	for i := 0; i < len(data); {
+		lt := bytes.IndexByte(data[i:], '<')
+		if lt < 0 {
+			return false
 		}
-		switch tok.(type) {
-		case xml.StartElement:
-			if depth++; depth > MaxDepth {
-				return ErrTooDeep
-			}
-		case xml.EndElement:
+		i += lt
+		rest := data[i:]
+		switch {
+		case bytes.HasPrefix(rest, []byte("<!--")):
+			i = skipPast(data, i+4, "-->")
+		case bytes.HasPrefix(rest, []byte("<![CDATA[")):
+			i = skipPast(data, i+9, "]]>")
+		case bytes.HasPrefix(rest, []byte("<?")):
+			i = skipPast(data, i+2, "?>")
+		case bytes.HasPrefix(rest, []byte("<!")):
+			i = skipDirective(data, i+2)
+		case bytes.HasPrefix(rest, []byte("</")):
 			depth--
+			i = skipPast(data, i+2, ">")
+		default:
+			end, selfClosing := scanStartTag(data, i+1)
+			if depth+1 > limit {
+				return true
+			}
+			if !selfClosing {
+				depth++
+			}
+			i = end
 		}
 	}
+	return false
+}
+
+func skipPast(data []byte, from int, terminator string) int {
+	if end := bytes.Index(data[from:], []byte(terminator)); end >= 0 {
+		return from + end + len(terminator)
+	}
+	return len(data)
+}
+
+// skipDirective skips a <!...> declaration the way encoding/xml does: the
+// first byte is taken verbatim, quotes hide angle brackets, nested <...>
+// pairs balance and nested comments are skipped whole. Diverging here could
+// make the scanner swallow real elements and under-count.
+func skipDirective(data []byte, i int) int {
+	i++
+	var inquote byte
+	nesting := 0
+	for ; i < len(data); i++ {
+		b := data[i]
+		if inquote == 0 && b == '>' && nesting == 0 {
+			return i + 1
+		}
+		switch {
+		case b == inquote:
+			inquote = 0
+		case inquote != 0:
+		case b == '\'' || b == '"':
+			inquote = b
+		case b == '>':
+			nesting--
+		case b == '<':
+			if bytes.HasPrefix(data[i+1:], []byte("!--")) {
+				i = skipPast(data, i+4, "-->") - 1
+				continue
+			}
+			nesting++
+		}
+	}
+	return len(data)
+}
+
+func scanStartTag(data []byte, i int) (end int, selfClosing bool) {
+	for ; i < len(data); i++ {
+		switch data[i] {
+		case '"', '\'':
+			if close := bytes.IndexByte(data[i+1:], data[i]); close >= 0 {
+				i += close + 1
+			} else {
+				return len(data), false
+			}
+		case '>':
+			return i + 1, data[i-1] == '/'
+		}
+	}
+	return len(data), false
 }
 
 // checkTOMLDepth over-approximates nesting as open arrays and inline tables
