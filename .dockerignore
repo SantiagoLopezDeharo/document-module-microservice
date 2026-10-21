@@ -1,4 +1,6 @@
-.git
-.env
-test
-repro_xml.go
+*
+!go.mod
+!go.sum
+!cmd/
+!internal/
+**/*_test.go
