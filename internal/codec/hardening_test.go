@@ -58,6 +58,14 @@ func TestJSONPreservesLargeIntegers(t *testing.T) {
 	}
 }
 
+func TestJSONRejectsNumbersOutsideFloat64(t *testing.T) {
+	for _, input := range []string{`1e400`, `[-1e400]`, `{"a":{"b":123e999}}`, `1e309`} {
+		if _, err := decodeString(t, models.FormatJSON, input); err == nil {
+			t.Errorf("%s accepted", input)
+		}
+	}
+}
+
 func TestJSONNormalizesNestedNumbers(t *testing.T) {
 	got, err := decodeString(t, models.FormatJSON, `[{"a":[1,{"b":9007199254740995}]}]`)
 	if err != nil {
