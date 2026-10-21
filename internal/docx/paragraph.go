@@ -1,6 +1,9 @@
 package docx
 
-import "encoding/xml"
+import (
+	"encoding/xml"
+	"strings"
+)
 
 type Paragraph struct {
 	XMLName xml.Name `xml:"w:p"`
@@ -13,6 +16,10 @@ type Paragraph struct {
 func (p *Paragraph) AddText(text string) *Run {
 	t := &Text{
 		Text: text,
+	}
+	// Word trims unannotated runs, which would glue adjacent runs together.
+	if strings.TrimSpace(text) != text {
+		t.XMLSpace = "preserve"
 	}
 
 	run := &Run{
