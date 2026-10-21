@@ -27,6 +27,7 @@ func (c *jsonCodec) Decode(r io.Reader) (interface{}, error) {
 
 func (c *jsonCodec) Encode(w io.Writer, data interface{}) error {
 	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
 	enc.SetIndent("", "  ")
 	return enc.Encode(data)
 }
