@@ -11,8 +11,19 @@ import (
 
 type xlsxCodec struct{}
 
+// Workbooks are zip archives, so a small upload can inflate enormously. These
+// limits bound the decompressed size and keep every part in memory instead of
+// spilling large XML parts to temporary files.
+const (
+	maxUnzipBytes    = 256 << 20
+	maxUnzipXMLBytes = maxUnzipBytes
+)
+
 func (c *xlsxCodec) Decode(r io.Reader) (interface{}, error) {
-	f, err := excelize.OpenReader(r)
+	f, err := excelize.OpenReader(r, excelize.Options{
+		UnzipSizeLimit:    maxUnzipBytes,
+		UnzipXMLSizeLimit: maxUnzipXMLBytes,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -51,11 +62,7 @@ func (c *xlsxCodec) Decode(r io.Reader) (interface{}, error) {
 
 func (c *xlsxCodec) Encode(w io.Writer, data interface{}) error {
 	f := excelize.NewFile()
-	defer func() {
-		if err := f.Close(); err != nil {
-			fmt.Printf("Error closing excel file: %v\n", err)
-		}
-	}()
+	defer f.Close()
 
 	// Normalize data to []map[string]interface{}
 	var rows []map[string]interface{}

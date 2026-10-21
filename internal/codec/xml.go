@@ -14,6 +14,9 @@ func (c *xmlCodec) Decode(r io.Reader) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := checkXMLDepth(b); err != nil {
+		return nil, err
+	}
 	mv, err := mxj.NewMapXml(b)
 	if err != nil {
 		return nil, err

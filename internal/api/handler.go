@@ -1,7 +1,7 @@
 package api
 
 import (
-	"fmt"
+	"bytes"
 	"net/http"
 	"strings"
 
@@ -11,11 +11,6 @@ import (
 )
 
 func convertHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
 	inputFormat := parseInputFormat(r)
 	outputFormat := parseOutputFormat(r)
 
@@ -36,17 +31,18 @@ func convertHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", utils.GetContentType(outputFormat))
-
 	data, err := decoder.Decode(r.Body)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Decode error: %v", err), http.StatusBadRequest)
+		clientError(w, "Decode error", err)
 		return
 	}
 
-	if err := encoder.Encode(w, data); err != nil {
-		fmt.Printf("Encode error: %v\n", err)
+	var out bytes.Buffer
+	if err := encoder.Encode(&out, data); err != nil {
+		http.Error(w, "Encode error: "+err.Error(), http.StatusUnprocessableEntity)
+		return
 	}
+	writeBody(w, utils.GetContentType(outputFormat), out.Bytes())
 }
 
 func parseInputFormat(r *http.Request) models.Format {

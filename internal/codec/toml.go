@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"bytes"
 	"io"
 
 	"github.com/pelletier/go-toml/v2"
@@ -9,8 +10,15 @@ import (
 type tomlCodec struct{}
 
 func (c *tomlCodec) Decode(r io.Reader) (interface{}, error) {
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkTOMLDepth(b); err != nil {
+		return nil, err
+	}
 	var data interface{}
-	if err := toml.NewDecoder(r).Decode(&data); err != nil {
+	if err := toml.NewDecoder(bytes.NewReader(b)).Decode(&data); err != nil {
 		return nil, err
 	}
 

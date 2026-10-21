@@ -9,8 +9,15 @@ import (
 type msgpackCodec struct{}
 
 func (c *msgpackCodec) Decode(r io.Reader) (interface{}, error) {
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkMsgpackDepth(b); err != nil {
+		return nil, err
+	}
 	var data interface{}
-	if err := msgpack.NewDecoder(r).Decode(&data); err != nil {
+	if err := msgpack.Unmarshal(b, &data); err != nil {
 		return nil, err
 	}
 	return data, nil

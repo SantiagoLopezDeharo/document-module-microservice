@@ -106,7 +106,7 @@ func TestConvertHandler(t *testing.T) {
 			}
 
 			w := httptest.NewRecorder()
-			convertHandler(w, req)
+			testRouter(t).ServeHTTP(w, req)
 
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status %d, got %d", tt.expectedStatus, w.Code)
@@ -116,7 +116,7 @@ func TestConvertHandler(t *testing.T) {
 }
 
 func TestHealthEndpoint(t *testing.T) {
-	router := NewRouter()
+	router := testRouter(t)
 	req := httptest.NewRequest("GET", "/health", nil)
 	w := httptest.NewRecorder()
 

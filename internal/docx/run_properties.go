@@ -8,6 +8,8 @@ const (
 
 type RunProperties struct {
 	XMLName  xml.Name  `xml:"w:rPr"`
+	Bold     *Bold     `xml:"w:b,omitempty"`
+	Italic   *Italic   `xml:"w:i,omitempty"`
 	Color    *Color    `xml:"w:color,omitempty"`
 	Size     *Size     `xml:"w:sz,omitempty"`
 	RunStyle *RunStyle `xml:"w:rStyle,omitempty"`
@@ -16,6 +18,14 @@ type RunProperties struct {
 type RunStyle struct {
 	XMLName xml.Name `xml:"w:rStyle"`
 	Val     string   `xml:"w:val,attr"`
+}
+
+type Bold struct {
+	XMLName xml.Name `xml:"w:b"`
+}
+
+type Italic struct {
+	XMLName xml.Name `xml:"w:i"`
 }
 
 type Color struct {

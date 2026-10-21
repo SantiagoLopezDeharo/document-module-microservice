@@ -25,11 +25,23 @@ func (c *propertiesCodec) Decode(r io.Reader) (interface{}, error) {
 		return nil, err
 	}
 
-	p := properties.MustLoadString(string(buf))
+	// Expansion stays disabled: ${...} is data to convert, and expanding it made
+	// a circular reference call log.Fatal and terminate the server.
+	loader := properties.Loader{Encoding: properties.UTF8, DisableExpansion: true}
+	p, err := loader.LoadBytes(buf)
+	if err != nil {
+		return nil, err
+	}
 
+	flat := p.Map()
+	for key := range flat {
+		if err := checkKeyDepth(key); err != nil {
+			return nil, err
+		}
+	}
 	// Convert to map[string]interface{}
 	// We unflatten keys with dots to support nested structures
-	return unflattenProperties(p.Map()), nil
+	return unflattenProperties(flat), nil
 }
 
 func unflattenProperties(flat map[string]string) map[string]interface{} {

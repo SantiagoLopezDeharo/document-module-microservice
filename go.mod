@@ -4,7 +4,6 @@ go 1.27.3
 
 require (
 	github.com/clbanning/mxj/v2 v2.7.0
-	github.com/gingfrederik/docx v0.0.1
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/google/go-cmp v0.7.0
 	github.com/magiconair/properties v1.18.12

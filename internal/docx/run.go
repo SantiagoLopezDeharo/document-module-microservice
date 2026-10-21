@@ -24,6 +24,18 @@ func (r *Run) Color(color string) *Run {
 	return r
 }
 
+// Bold set run bold
+func (r *Run) Bold() *Run {
+	r.RunProperties.Bold = &Bold{}
+	return r
+}
+
+// Italic set run italic
+func (r *Run) Italic() *Run {
+	r.RunProperties.Italic = &Italic{}
+	return r
+}
+
 // Size set run size
 func (r *Run) Size(size int) *Run {
 	r.RunProperties.Size = &Size{
