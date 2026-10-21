@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"maps"
 	"strings"
 	"unicode"
 
@@ -12,42 +13,77 @@ import (
 
 type xmlCodec struct{}
 
-// mxj writes values verbatim unless told otherwise, which produced malformed
-// XML for "&" and let values such as "</a><admin>true</admin>" inject markup.
-func init() {
-	mxj.XMLEscapeChars(true)
+var xmlEscaper = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;", "'", "&apos;")
+
+// prepareXML validates element and attribute names and escapes string values
+// for mxj, which writes both verbatim: unescaped values produced malformed
+// XML for "&" and let "</a><admin>true</admin>" inject markup. Containers are
+// copied only along the paths to values that need escaping, so the caller's
+// data is never modified and clean data costs no allocations. "-name" keys
+// are attributes and "#text" is element text, mirroring how mxj decodes XML.
+func prepareXML(v interface{}) (interface{}, bool, error) {
+	switch val := v.(type) {
+	case string:
+		if strings.ContainsAny(val, `&<>"'`) {
+			return xmlEscaper.Replace(val), true, nil
+		}
+	case map[string]interface{}:
+		return prepareXMLMap(val)
+	case mxj.Map:
+		return prepareXMLMap(val)
+	case []interface{}:
+		return prepareXMLList(val, func(i int) interface{} { return val[i] })
+	case []map[string]interface{}:
+		return prepareXMLList(val, func(i int) interface{} { return val[i] })
+	}
+	return v, false, nil
 }
 
-// validateXMLNames rejects keys that cannot be element or attribute names,
-// since mxj would emit them verbatim. "-name" keys are attributes and "#text"
-// is element text, mirroring how mxj decodes XML.
-func validateXMLNames(v interface{}) error {
-	switch val := v.(type) {
-	case map[string]interface{}:
-		for key, child := range val {
-			if key != "#text" && !isXMLName(strings.TrimPrefix(key, "-")) {
-				return fmt.Errorf("key %q is not a valid XML name", key)
-			}
-			if err := validateXMLNames(child); err != nil {
-				return err
+func prepareXMLList[T any](list []T, item func(int) interface{}) (interface{}, bool, error) {
+	var out []interface{}
+	for i := range list {
+		escaped, changed, err := prepareXML(item(i))
+		if err != nil {
+			return nil, false, err
+		}
+		if !changed {
+			continue
+		}
+		if out == nil {
+			out = make([]interface{}, len(list))
+			for j := range list {
+				out[j] = item(j)
 			}
 		}
-	case mxj.Map:
-		return validateXMLNames(map[string]interface{}(val))
-	case []interface{}:
-		for _, child := range val {
-			if err := validateXMLNames(child); err != nil {
-				return err
-			}
+		out[i] = escaped
+	}
+	if out != nil {
+		return out, true, nil
+	}
+	return list, false, nil
+}
+
+func prepareXMLMap(m map[string]interface{}) (interface{}, bool, error) {
+	var out map[string]interface{}
+	for key, child := range m {
+		if key != "#text" && !isXMLName(strings.TrimPrefix(key, "-")) {
+			return nil, false, fmt.Errorf("key %q is not a valid XML name", key)
 		}
-	case []map[string]interface{}:
-		for _, child := range val {
-			if err := validateXMLNames(child); err != nil {
-				return err
+		escaped, changed, err := prepareXML(child)
+		if err != nil {
+			return nil, false, err
+		}
+		if changed {
+			if out == nil {
+				out = maps.Clone(m)
 			}
+			out[key] = escaped
 		}
 	}
-	return nil
+	if out != nil {
+		return out, true, nil
+	}
+	return m, false, nil
 }
 
 func isXMLName(name string) bool {
@@ -103,7 +139,8 @@ func (c *xmlCodec) Decode(b []byte) (interface{}, error) {
 }
 
 func (c *xmlCodec) Encode(w io.Writer, data interface{}) error {
-	if err := validateXMLNames(data); err != nil {
+	data, _, err := prepareXML(data)
+	if err != nil {
 		return err
 	}
 	if m, ok := data.(map[string]interface{}); ok {

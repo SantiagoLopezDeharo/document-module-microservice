@@ -48,6 +48,51 @@ func TestXMLEncodeEscapesValues(t *testing.T) {
 	}
 }
 
+func TestXMLEncodeDoesNotModifyItsInput(t *testing.T) {
+	data := map[string]interface{}{
+		"a":    "x & y",
+		"list": []interface{}{"<b>", map[string]interface{}{"c": "'q'"}},
+		"rows": []map[string]interface{}{{"d": "1 > 0"}},
+		"keep": "clean",
+	}
+	for range 3 {
+		out := encodeString(t, models.FormatXML, data)
+		wellFormedXML(t, out)
+		if strings.Contains(out, "&amp;amp;") {
+			t.Fatalf("value escaped twice:\n%s", out)
+		}
+	}
+	if data["a"] != "x & y" || data["list"].([]interface{})[0] != "<b>" ||
+		data["list"].([]interface{})[1].(map[string]interface{})["c"] != "'q'" || data["rows"].([]map[string]interface{})[0]["d"] != "1 > 0" {
+		t.Fatalf("Encode modified its input: %v", data)
+	}
+}
+
+func TestXMLEncodeEscapesAttributesAndText(t *testing.T) {
+	data := map[string]interface{}{"item": map[string]interface{}{"-id": `a"b&c`, "#text": "x<y"}}
+	out := encodeString(t, models.FormatXML, data)
+	wellFormedXML(t, out)
+	back, err := decodeString(t, models.FormatXML, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := back.(map[string]interface{})
+	if item["-id"] != `a"b&c` || item["#text"] != "x<y" {
+		t.Errorf("round trip = %v", item)
+	}
+}
+
+func BenchmarkXMLEncodeRows(b *testing.B) {
+	rows := make([]interface{}, 30000)
+	for i := range rows {
+		rows[i] = map[string]interface{}{"id": float64(i), "name": "User", "email": "u@example.com", "note": "a & b"}
+	}
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = (&xmlCodec{}).Encode(&bytes.Buffer{}, rows)
+	}
+}
+
 func TestXMLEncodeRejectsInvalidElementNames(t *testing.T) {
 	c, _ := GetCodec(models.FormatXML)
 	for _, key := range []string{"a><b", "first name", "1st", "", "a/b", "x=y", "<x>", "-", "a&b"} {
