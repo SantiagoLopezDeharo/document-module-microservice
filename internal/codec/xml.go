@@ -2,12 +2,68 @@ package codec
 
 import (
 	"encoding/xml"
+	"fmt"
 	"io"
+	"strings"
+	"unicode"
 
 	"github.com/clbanning/mxj/v2"
 )
 
 type xmlCodec struct{}
+
+// mxj writes values verbatim unless told otherwise, which produced malformed
+// XML for "&" and let values such as "</a><admin>true</admin>" inject markup.
+func init() {
+	mxj.XMLEscapeChars(true)
+}
+
+// validateXMLNames rejects keys that cannot be element or attribute names,
+// since mxj would emit them verbatim. "-name" keys are attributes and "#text"
+// is element text, mirroring how mxj decodes XML.
+func validateXMLNames(v interface{}) error {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		for key, child := range val {
+			if key != "#text" && !isXMLName(strings.TrimPrefix(key, "-")) {
+				return fmt.Errorf("key %q is not a valid XML name", key)
+			}
+			if err := validateXMLNames(child); err != nil {
+				return err
+			}
+		}
+	case mxj.Map:
+		return validateXMLNames(map[string]interface{}(val))
+	case []interface{}:
+		for _, child := range val {
+			if err := validateXMLNames(child); err != nil {
+				return err
+			}
+		}
+	case []map[string]interface{}:
+		for _, child := range val {
+			if err := validateXMLNames(child); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func isXMLName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for i, r := range name {
+		switch {
+		case r == '_' || r == ':' || unicode.IsLetter(r):
+		case i > 0 && (r == '-' || r == '.' || unicode.IsDigit(r)):
+		default:
+			return false
+		}
+	}
+	return true
+}
 
 func (c *xmlCodec) Decode(r io.Reader) (interface{}, error) {
 	b, err := io.ReadAll(r)
@@ -51,6 +107,9 @@ func (c *xmlCodec) Decode(r io.Reader) (interface{}, error) {
 }
 
 func (c *xmlCodec) Encode(w io.Writer, data interface{}) error {
+	if err := validateXMLNames(data); err != nil {
+		return err
+	}
 	if m, ok := data.(map[string]interface{}); ok {
 		// If map has multiple keys, wrap it in "doc" to ensure valid XML root
 		if len(m) != 1 {
