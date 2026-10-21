@@ -18,6 +18,13 @@ func (c *yamlCodec) Decode(data []byte) (interface{}, error) {
 }
 
 func (c *yamlCodec) Encode(w io.Writer, data interface{}) error {
+	if ok, err := emitPlainYAML(w, data); ok {
+		return err
+	}
+	return encodeYAMLV3(w, data)
+}
+
+func encodeYAMLV3(w io.Writer, data interface{}) error {
 	enc := yaml.NewEncoder(w)
 	enc.SetIndent(2)
 	return enc.Encode(data)
