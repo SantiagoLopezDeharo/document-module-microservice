@@ -304,10 +304,10 @@ Error bodies are `text/plain` messages.
 | Status | Meaning |
 |--------|---------|
 | `200` | Converted data or generated document |
-| `400` | Missing or unsupported format, malformed input, invalid JSON request, invalid document action, workbook that inflates beyond 256 MiB |
+| `400` | Missing or unsupported format, malformed input, JSON or YAML nested beyond 10 000 levels (`exceeded max depth`), invalid JSON request, invalid document action, workbook that inflates beyond 256 MiB |
 | `404` | Unknown route |
 | `405` | Wrong method for a known route (`Allow` header lists the right one) |
-| `413` | Body, nesting depth, action count or worksheet budget over the limit |
+| `413` | Body, action count or worksheet budget over the limit; XML, TOML, MessagePack or `.properties` nested beyond 10 000 levels |
 | `422` | Valid input that the output format cannot represent |
 | `431` | Request headers over 64 KiB |
 | `500` | Unexpected rendering failure; details are logged, not returned |
@@ -335,7 +335,7 @@ Within that boundary, every request is treated as untrusted:
 
 - **Transport limits**: bodies over `MAX_BODY_BYTES` get `413`; headers over 64 KiB get `431`; headers must arrive within 10 seconds (slowloris); reads and writes are capped at 5 minutes and idle keep-alive connections at 120 seconds.
 - **Bounded work**: at most `MAX_CONCURRENT_REQUESTS` requests decode or render at once, so CPU and memory stay bounded however many clients connect. A body is read before a slot is taken.
-- **Nesting**: 10 000 levels in every format. JSON and YAML rely on their parsers' own limits. XML and TOML are pre-scanned without tokenizing and `.properties` keys are checked, because those decoders recurse without a limit and deep input would overflow the goroutine stack.
+- **Nesting**: 10 000 levels in every format. JSON and YAML rely on their parsers' own limits and report deeper input as a decode error (`400`). XML and TOML are pre-scanned without tokenizing, MessagePack is validated iteratively and `.properties` keys are checked, because those decoders recurse without a limit and deep input would overflow the goroutine stack; they reject deeper input with `413`.
 - **Length bombs**: MessagePack is validated iteratively before decoding, rejecting containers that declare more items than the body holds (five bytes used to allocate 64 GB). YAML alias bombs and XML entity expansion are covered by the security suite.
 - **Zip bombs**: uploaded workbooks may inflate to at most 256 MiB and are parsed in memory.
 - **Injection**: XML output escapes values and rejects invalid element names, so data cannot inject markup. DOCX text is escaped and colors must match a hex pattern. PDF fonts are limited to the core fonts, so font names cannot point at files. `.properties` expansion is disabled, so `${...}` cannot loop or read other keys.
