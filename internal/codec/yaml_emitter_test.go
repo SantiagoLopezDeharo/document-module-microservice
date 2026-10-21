@@ -3,6 +3,7 @@ package codec
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"math"
 	"reflect"
 	"strconv"
@@ -184,6 +185,20 @@ func TestPlainYAMLLayout(t *testing.T) {
 `
 	if _, got := viaPlainEmitter(t, data); got != want {
 		t.Errorf("layout:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPlainYAMLThroughPlainWriter(t *testing.T) {
+	var direct, wrapped bytes.Buffer
+	data := yamlRowsForTest(20)
+	if _, err := emitPlainYAML(&direct, data); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := emitPlainYAML(struct{ io.Writer }{&wrapped}, data); err != nil {
+		t.Fatal(err)
+	}
+	if direct.String() != wrapped.String() {
+		t.Error("buffered and direct output differ")
 	}
 }
 

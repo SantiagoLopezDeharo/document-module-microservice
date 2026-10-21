@@ -18,7 +18,16 @@ import (
 // allocating about 400 bytes per input byte on large lists; this writer
 // streams with no per-value allocations beyond key sorting.
 type yamlEmitter struct {
-	w *bufio.Writer
+	w yamlSink
+}
+
+// yamlSink is satisfied by both *bytes.Buffer, which the HTTP layer encodes
+// into, and *bufio.Writer, used for any other writer.
+type yamlSink interface {
+	io.Writer
+	io.ByteWriter
+	io.StringWriter
+	WriteRune(rune) (int, error)
 }
 
 type yamlContext int
@@ -35,9 +44,15 @@ func emitPlainYAML(w io.Writer, data interface{}) (bool, error) {
 	if !plainYAMLData(data) {
 		return false, nil
 	}
-	e := yamlEmitter{w: bufio.NewWriterSize(w, 32<<10)}
+	if sink, ok := w.(yamlSink); ok {
+		e := yamlEmitter{w: sink}
+		e.node(data, yamlDocument, 0)
+		return true, nil
+	}
+	buffered := bufio.NewWriterSize(w, 32<<10)
+	e := yamlEmitter{w: buffered}
 	e.node(data, yamlDocument, 0)
-	return true, e.w.Flush()
+	return true, buffered.Flush()
 }
 
 func plainYAMLData(v interface{}) bool {
