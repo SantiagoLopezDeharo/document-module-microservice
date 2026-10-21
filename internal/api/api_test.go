@@ -325,6 +325,19 @@ func TestGuardedCapsBody(t *testing.T) {
 	}
 }
 
+func TestBufferPool(t *testing.T) {
+	buf := getBuffer(1000)
+	if buf.Len() != 0 || buf.Cap() < 1000 {
+		t.Fatalf("len %d cap %d", buf.Len(), buf.Cap())
+	}
+	buf.WriteString("leftover")
+	putBuffer(buf)
+	if again := getBuffer(10); again.Len() != 0 {
+		t.Fatalf("pooled buffer not reset: %q", again)
+	}
+	putBuffer(getBuffer(maxPooledBuffer + 1))
+}
+
 func BenchmarkConvertJSONToCSV(b *testing.B) {
 	var body strings.Builder
 	body.WriteString("[")
