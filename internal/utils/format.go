@@ -10,6 +10,9 @@ func MimeToFormat(mime string) models.Format {
 	if strings.Contains(mime, "application/json") {
 		return models.FormatJSON
 	}
+	if strings.Contains(mime, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
+		return models.FormatXLSX
+	}
 	if strings.Contains(mime, "xml") {
 		return models.FormatXML
 	}
@@ -27,9 +30,6 @@ func MimeToFormat(mime string) models.Format {
 	}
 	if strings.Contains(mime, "application/msgpack") || strings.Contains(mime, "application/x-msgpack") {
 		return models.FormatMsgPack
-	}
-	if strings.Contains(mime, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
-		return models.FormatXLSX
 	}
 	if strings.Contains(mime, "text/x-java-properties") || strings.Contains(mime, "text/properties") {
 		return models.FormatProperties
