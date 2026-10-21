@@ -22,6 +22,7 @@ type PDFAction struct {
 	Border string  `json:"border,omitempty"`
 	Ln     int     `json:"ln,omitempty"`
 	Align  string  `json:"align,omitempty"`
+	Fill   bool    `json:"fill,omitempty"`
 
 	R int `json:"r,omitempty"`
 	G int `json:"g,omitempty"`
@@ -45,7 +46,9 @@ func RenderPDF(req PDFRequest, limits Limits) ([]byte, error) {
 		return nil, fmt.Errorf("%w: page setup: %w", ErrInvalid, err)
 	}
 
+	toCoreFontEncoding := pdf.UnicodeTranslatorFromDescriptor("")
 	for i, action := range req.Actions {
+		action.Txt = toCoreFontEncoding(action.Txt)
 		if err := applyPDFAction(pdf, action); err != nil {
 			return nil, &ActionError{Index: i, Type: action.Type, Err: err}
 		}
@@ -68,9 +71,9 @@ func applyPDFAction(pdf *fpdf.Fpdf, a PDFAction) error {
 	case "SetFont":
 		pdf.SetFont(a.Family, a.Style, a.Size)
 	case "Cell":
-		pdf.CellFormat(a.W, a.H, a.Txt, a.Border, a.Ln, a.Align, false, 0, "")
+		pdf.CellFormat(a.W, a.H, a.Txt, a.Border, a.Ln, a.Align, a.Fill, 0, "")
 	case "MultiCell":
-		pdf.MultiCell(a.W, a.H, a.Txt, a.Border, a.Align, false)
+		pdf.MultiCell(a.W, a.H, a.Txt, a.Border, a.Align, a.Fill)
 	case "Ln":
 		pdf.Ln(a.H)
 	case "SetXY":

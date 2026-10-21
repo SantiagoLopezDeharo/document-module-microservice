@@ -207,13 +207,13 @@ Top-level `orientation` (`P` or `L`, default `P`), `unit` (`pt`, `mm`, `cm`, `in
 |--------|--------|
 | `AddPage` | – |
 | `SetFont` | `family`, `style` (`""`, or a combination of `B` bold, `I` italic, `U` underline, `S` strikeout), `size` |
-| `Cell` | `w`, `h`, `txt`, `border` (`"0"`, `"1"` or sides `L`/`T`/`R`/`B`), `ln` (`0` right, `1` next line, `2` below), `align` (`L`, `C`, `R`) |
-| `MultiCell` | `w`, `h`, `txt`, `border`, `align` (`L`, `C`, `R`, `J`); wraps text |
+| `Cell` | `w`, `h`, `txt`, `border` (`"0"`, `"1"` or sides `L`/`T`/`R`/`B`), `ln` (`0` right, `1` next line, `2` below), `align` (`L`, `C`, `R`), `fill` (paint the cell background with the current fill color) |
+| `MultiCell` | `w`, `h`, `txt`, `border`, `align` (`L`, `C`, `R`, `J`), `fill`; wraps text |
 | `Ln` | `h` |
 | `SetXY` | `x`, `y` |
 | `SetTextColor`, `SetDrawColor`, `SetFillColor` | `r`, `g`, `b` (0–255) |
 
-Fonts are the PDF core fonts: Arial/Helvetica, Times, Courier and ZapfDingbats (fpdf treats `Symbol` as an alias of ZapfDingbats). Cells are drawn without fill, so `SetFillColor` currently has no visible effect.
+Fonts are the PDF core fonts: Arial/Helvetica, Times, Courier and ZapfDingbats (fpdf treats `Symbol` as an alias of ZapfDingbats). `txt` is UTF-8 and is converted to the fonts' Windows-1252 encoding, so Western European text and `€` render correctly; characters outside Windows-1252 (for example Cyrillic, Greek or CJK) render as `.`. Cells are transparent unless `"fill": true` is set; `SetFillColor` only chooses the color used by filled cells.
 
 ```shell
 curl -X POST http://localhost:8080/convert/pdf -o report.pdf -d '{
@@ -227,9 +227,10 @@ curl -X POST http://localhost:8080/convert/pdf -o report.pdf -d '{
     {"type": "Ln", "h": 6},
     {"type": "SetFont", "family": "Arial", "style": "B", "size": 11},
     {"type": "SetDrawColor", "r": 120, "g": 120, "b": 120},
-    {"type": "Cell", "w": 30, "h": 8, "txt": "ID", "border": "1", "align": "C"},
-    {"type": "Cell", "w": 100, "h": 8, "txt": "Item", "border": "1"},
-    {"type": "Cell", "w": 40, "h": 8, "txt": "Amount", "border": "1", "ln": 1, "align": "R"},
+    {"type": "SetFillColor", "r": 221, "g": 235, "b": 247},
+    {"type": "Cell", "w": 30, "h": 8, "txt": "ID", "border": "1", "align": "C", "fill": true},
+    {"type": "Cell", "w": 100, "h": 8, "txt": "Item", "border": "1", "fill": true},
+    {"type": "Cell", "w": 40, "h": 8, "txt": "Amount", "border": "1", "ln": 1, "align": "R", "fill": true},
     {"type": "SetFont", "family": "Arial", "size": 11},
     {"type": "Cell", "w": 30, "h": 8, "txt": "1", "border": "1", "align": "C"},
     {"type": "Cell", "w": 100, "h": 8, "txt": "Item Alpha", "border": "1"},
