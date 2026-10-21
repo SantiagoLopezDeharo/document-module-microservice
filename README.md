@@ -186,14 +186,14 @@ Every conversion passes through a generic value, so what a format can express de
 | Format | Decoding | Encoding |
 |--------|----------|----------|
 | JSON | Arbitrary documents. Integer literals stay integers (up to `uint64`), so large identifiers keep every digit; other numbers become `float64`. Trailing data after the document is rejected. | Indented, HTML characters not escaped. |
-| CSV, TSV | The first row is the header; every value is a string and empty cells are omitted. | Needs a list of objects or a single object. Columns are the sorted union of keys, nested objects are flattened to `parent.child`. |
+| CSV, TSV | The first row is the header; every value is a string and empty cells are omitted. | Needs a list of objects or a single object. Columns are the sorted union of keys, nested objects are flattened to `parent.child` and a key that itself contains dots keeps its own column. Arrays are written as compact JSON, e.g. `["a","b"]`. |
 | XLSX | Reads the first sheet with the same rules as CSV. | Same rules as CSV, written to `Sheet1`. |
 | XML | The root element is unwrapped; repeated `<List>` children become a list. Attributes become `-name` keys, element text `#text`, values are strings. | A map with one key uses it as the root element, otherwise the document is wrapped in `<doc>`; lists become repeated `<List>` elements. Keys must be valid XML names and values are escaped. |
 | TOML | Arbitrary tables; a lone `root` array is unwrapped. | Root-level arrays are wrapped in a `root` key, since TOML has no top-level arrays. Integers stay integers, so `8080` is written as `8080` and `8080.0` as `8080.0`. |
 | YAML, MessagePack | Arbitrary documents. | Arbitrary documents. |
 | Properties | Dotted keys and `[n]` indices are rebuilt into objects and lists; integers, floats and booleans are inferred. `${...}` is never expanded. | Needs an object. Nested keys are flattened (`db.host`, `db.ports[0]`), sorted and escaped. |
 
-A value the output format cannot represent, such as a list of numbers as CSV, a key that is not an XML name or an integer above `int64` as TOML, returns `422`.
+A value the output format cannot represent, such as a key that is not an XML name or an integer above `int64` as TOML, returns `422`.
 
 ### Document generation
 

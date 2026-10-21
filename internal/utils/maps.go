@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -35,27 +37,51 @@ func FlattenKeys(data map[string]interface{}, prefix string, keySet map[string]b
 	}
 }
 
+// GetValue resolves a header produced by CollectHeaders. A key may itself
+// contain dots, so a literal match wins over a split into nested objects.
 func GetValue(row map[string]interface{}, key string) (string, bool) {
-	parts := strings.Split(key, ".")
-	var current interface{} = row
-
-	for _, part := range parts {
-		m, ok := current.(map[string]interface{})
-		if !ok {
-			return "", false
-		}
-
-		val, exists := m[part]
-		if !exists {
-			return "", false
-		}
-
-		current = val
+	value, ok := lookup(row, key)
+	if !ok {
+		return "", false
 	}
+	return formatValue(value), true
+}
 
-	if current == nil {
-		return "", true
+func lookup(data map[string]interface{}, key string) (interface{}, bool) {
+	if value, ok := data[key]; ok {
+		return value, true
 	}
+	for i := 0; i < len(key); i++ {
+		if key[i] != '.' {
+			continue
+		}
+		if child, ok := data[key[:i]].(map[string]interface{}); ok {
+			if value, found := lookup(child, key[i+1:]); found {
+				return value, true
+			}
+		}
+	}
+	return nil, false
+}
 
-	return fmt.Sprintf("%v", current), true
+func formatValue(value interface{}) string {
+	switch value.(type) {
+	case nil:
+		return ""
+	case []interface{}, []map[string]interface{}, map[string]interface{}:
+		if encoded, err := marshalJSON(value); err == nil {
+			return encoded
+		}
+	}
+	return fmt.Sprintf("%v", value)
+}
+
+func marshalJSON(value interface{}) (string, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(value); err != nil {
+		return "", err
+	}
+	return strings.TrimSuffix(buf.String(), "\n"), nil
 }

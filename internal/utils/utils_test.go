@@ -67,6 +67,10 @@ func TestGetValue(t *testing.T) {
 		"list": []interface{}{1, 2},
 		"f":    1.5,
 		"t":    true,
+		"a.b":  "literal",
+		"x.y":  map[string]interface{}{"z": 9},
+		"p":    map[string]interface{}{"q.r": 7},
+		"objs": []interface{}{map[string]interface{}{"k": "<v>"}},
 	}
 	tests := []struct {
 		key  string
@@ -75,10 +79,14 @@ func TestGetValue(t *testing.T) {
 	}{
 		{"a.b.c", "3", true},
 		{"n", "", true},
-		{"list", "[1 2]", true},
+		{"list", "[1,2]", true},
+		{"objs", `[{"k":"<v>"}]`, true},
+		{"x.y.z", "9", true},
+		{"p.q.r", "7", true},
+		{"p.q", "", false},
 		{"f", "1.5", true},
 		{"t", "true", true},
-		{"a.b", "map[c:3]", true},
+		{"a.b", "literal", true},
 		{"a.x", "", false},
 		{"a.b.c.d", "", false},
 		{"missing", "", false},
