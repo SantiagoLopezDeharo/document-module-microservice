@@ -15,8 +15,9 @@ Also has built in Documents (pdf, docx, excel) generation functionality that ens
 ## Features
 
 - **Supported Formats**: JSON, XML, CSV, TSV, TOML, YAML, MsgPack, XLSX, Properties.
-- **Concurrency**: Built on Go's efficient HTTP server, capable of handling concurrent requests.
-- **Streaming**: Streams data directly from request to response to minimize memory footprint (though RAM is assumed sufficient for the payload).
+- **Concurrency**: Built on Go's HTTP server; a configurable number of conversions run in parallel and the rest queue, so memory stays bounded no matter how many clients connect.
+- **Hardened input handling**: body size, nesting depth, document actions and worksheet size are all bounded; malformed or hostile documents get a 4xx instead of crashing the process.
+- **Faithful conversions**: XML output is escaped, JSON integers beyond 2^53 keep every digit, `${...}` in `.properties` files is kept literally.
 - **Flexible Negotiation**: Supports format specification via Query Parameters or HTTP Headers.
 
 ## Usage
@@ -99,7 +100,7 @@ The DOCX generation endpoint accepts a list of actions to construct the document
 ```
 
 **Supported DOCX Actions**: `AddParagraph`, `AddText`.
-**Supported Text Properties**: `txt`, `size`, `color` (hex), `bold`, `italic`.
+**Supported Text Properties**: `txt`, `size` (1–1638 pt), `color` (6-digit hex, optionally prefixed with `#`, or `auto`), `bold`, `italic`.
 
 **Expected JSON Structure (XLSX)**
 
@@ -145,7 +146,9 @@ The PDF generation endpoint accepts a list of commands to construct the PDF dyna
 }
 ```
 
-**Supported PDF Actions**: `AddPage`, `SetFont`, `Cell`, `MultiCell`, `Ln`, `SetTextColor`, `SetDrawColor`, `SetFillColor`.
+**Supported PDF Actions**: `AddPage`, `SetFont`, `Cell`, `MultiCell`, `Ln`, `SetXY`, `SetTextColor`, `SetDrawColor`, `SetFillColor`. Fonts are the PDF core fonts (Arial/Helvetica, Times, Courier, ZapfDingbats; fpdf treats `Symbol` as an alias of ZapfDingbats).
+
+Unknown action types, invalid parameters (unknown fonts or page sizes, malformed cell references, unknown style references) and actions that fail are rejected with `400` and a message naming the offending action, e.g. `action 3 (SetCellValue): ...`, instead of producing a partial document.
 
 **Generate PDF**
 
@@ -230,49 +233,41 @@ We can generate really complex documents using this, for example the following J
 ### Data Structure Assumptions
 
 - **CSV/TSV**: Requires the input to be a list of objects (or a single object which will be treated as a row). The first row is treated as the header.
-- **XML**: Uses a generic map structure. Lists are wrapped in `<List><Item>...</Item></List>` when converting to XML.
+- **XML**: Uses a generic map structure under a `<doc>` root. Top-level lists become repeated `<List>` elements, keys prefixed with `-` are attributes and `#text` is element text. Keys must be valid XML names.
 - **JSON/TOML/YAML/MsgPack**: Supports arbitrary objects and arrays.
 - **Properties**: Flattens nested structures into dot-notation keys (e.g., `parent.child=value`).
 - **XLSX**: Reads the first sheet. Assumes the first row is the header. Writes to "Sheet1".
+
+### Responses and errors
+
+| Status | Meaning |
+|--------|---------|
+| `200` | Converted or generated document |
+| `400` | Malformed input, unsupported format, invalid document action |
+| `405` | Wrong HTTP method |
+| `413` | Body, nesting depth, action count or worksheet size over the configured limits |
+| `422` | Valid input that the output format cannot represent (e.g. a list of numbers as CSV, a key that is not a valid XML name, an integer above `int64` as TOML) |
+| `500` | Unexpected failure; details are logged, not returned |
 
 ## Running the Service
 
 ### Local Development
 
-1. **Install Dependencies**:
-   ```bash
-   go mod download
-   ```
+Requires Go 1.27.3 or newer.
 
-2. **Run**:
-   ```bash
-   go run cmd/server/main.go
-   ```
-
-3. **Run Tests**:
-   ```bash
-   go test ./... -v
-   ```
-
-4. **Test Coverage**:
-   ```bash
-   go test ./... -cover
-   ```
-
-5. **Benchmarks**:
-   ```bash
-   cd internal/codec
-   go test -bench=. -benchmem
-   ```
+```bash
+go run ./cmd/server
+```
 
 ### Docker
 
-1. **Build and Run**:
-   ```bash
-   docker-compose up --build
-   ```
+A ~18 MB multi-arch (`linux/amd64`, `linux/arm64`) image built from `scratch` and running as a non-root user is published on Docker Hub:
 
-The service will be available at `http://localhost:8080`.
+```bash
+docker run --rm -p 8080:8080 slincsilver/document-module-microservice:latest
+```
+
+Or build locally with `docker-compose up --build`. The service shuts down gracefully on `SIGTERM`, letting in-flight conversions finish.
 
 ## Integration Guide
 
@@ -283,27 +278,52 @@ This service is designed to be a component in a larger architecture.
 
 ### Configuration
 
-- **SERVER_ADDRESS**: Environment variable to set the server address (default: `:8080`)
-  - Example: `SERVER_ADDRESS=:9000` to run on port 9000
-  - Can be configured in [docker-compose.yml](docker-compose.yml)
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SERVER_ADDRESS` | `:8080` | Listen address |
+| `MAX_BODY_BYTES` | `33554432` (32 MiB) | Largest accepted request body |
+| `MAX_ACTIONS` | `10000` | Most actions per PDF/DOCX/XLSX document |
+| `MAX_XLSX_CELLS` | `200000` | Worksheet budget for XLSX generation (rows plus cells up to the furthest column used in each row) |
+| `MAX_CONCURRENT_REQUESTS` | `2 × GOMAXPROCS` | Conversions processed at once; further requests wait. Bodies are received before a slot is taken, so slow uploads cannot hold slots |
+| `PPROF_ADDR` | – (off) | Address for an optional `net/http/pprof` listener, e.g. `127.0.0.1:6060`. Never expose it publicly |
 
-### Testing
+Nesting is limited to 10 000 levels in every format, and uploaded workbooks may inflate to at most 256 MiB. Invalid configuration stops the service at startup with every problem reported at once.
 
-The service includes comprehensive unit tests covering:
-- All format codecs (JSON, XML, CSV, TSV, TOML)
-- Format conversion combinations
-- Complex nested structures
-- Edge cases (empty arrays, single objects, type conversions)
-- HTTP API endpoints and error handling
+## 🧪 Testing
 
-**Test Coverage**: ~85% for codec layer, ~82% for API layer
+```bash
+make test        # unit tests with the race detector
+make e2e         # end-to-end suites against a race-detector build
+make e2e-image   # functional and security suites against the Docker image
+make perf        # performance scenarios and optimization report
+make bench       # micro benchmarks
+```
 
-### Performance Notes
+- **Unit tests** cover every package: all codecs and their nesting guards, JSON integer precision, fuzz targets for every decoder and document renderer, differential fuzzing of the YAML emitter, JSON encoder and XML depth scanner against their reference implementations, PDF text extraction, a golden DOCX `document.xml`, XLSX workbooks reopened with excelize, the worksheet budget, and every API status code.
+- **End-to-end tests** (`test/e2e`, build tag `e2e`) build the real binary with the race detector and coverage, boot it with a throwaway configuration and drive it over HTTP:
+  - *functional*: every format pair round-tripping a dataset of tricky strings, nested documents, 64-bit integers, header negotiation, 20 MiB payloads, generated PDF/DOCX/XLSX, graceful shutdown with in-flight requests, startup validation;
+  - *security*: nesting, MessagePack length, YAML alias, XML entity and XLSX zip bombs, XXE, XML output injection, worksheet amplification, document injection, body/header limits, slow uploads and slowloris, leak-free error bodies, connection floods and memory that stays bounded as clients grow, each asserting the process survives;
+  - *concurrency*: two dozen clients on every endpoint with per-request markers to detect cross-talk, parallel identical renders, queueing at the concurrency limit, shutdown under load. Any data race, panic or unclean exit fails the run.
+- **Performance suite** profiles the live server through pprof and writes `test/e2e/reports/perf-<label>.md` with latency percentiles, throughput, bytes allocated per input byte, peak memory, CPU and allocation hotspots and the optimization opportunities they point to. `E2E_BINARY` profiles another build and `E2E_PERF_BASELINE` adds a comparison column.
 
-- The service uses Go's standard library and optimized third-party libraries for parsing.
-- It streams data where possible, but full object decoding is required for format transformation.
-- Ensure the host has enough RAM to hold the unmarshaled representation of the largest expected payload.
+## ⚡ Performance
+
+Driven by the performance suite's findings; median of three runs on an Apple M3 Pro with the load generator on the same host, against the previous release of the service:
+
+| Scenario | Before | After |
+|----------|-------:|------:|
+| Small conversions, 32 clients | 61.2k req/s, p99 2.42 ms | 84.8k req/s, p99 1.68 ms |
+| CSV → YAML (5 MiB) | 8.0 MiB/s | 20.7 MiB/s |
+| CSV → XLSX (5 MiB) | 4.6 MiB/s | 16.5 MiB/s |
+| CSV → MessagePack (5 MiB) | 45.3 MiB/s | 96.8 MiB/s |
+| TOML → JSON | 55.0 MiB/s | 88.2 MiB/s |
+| CSV → XML (5 MiB) | 40.1 MiB/s | 33.2 MiB/s |
+| Peak memory, large-conversion scenario | 1353 MiB | 368 MiB |
+| DOCX generation, 16 clients | 1.7k doc/s | 7.3k doc/s |
+| PDF generation, 16 clients | 2.3k doc/s | 2.5k doc/s |
+
+Main changes: a streaming YAML emitter (yaml.v3 keeps every event of a document queued, about 400 bytes per input byte), excelize's stream writer for XLSX output, JSON indented in a single pass, an allocation-free XML depth check, request bodies read once and pooled output buffers. CSV → XML is slower than before because output is now escaped and validated (the previous version produced malformed XML for `&` and allowed markup injection) and responses are buffered so failures return a proper status instead of a truncated `200`. The remaining hotspots are inside dependencies: fpdf creates a new zlib writer per PDF stream and XLSX decoding is bound by excelize's XML parsing.
 
 ## License
 
-[MIT](LICENSE)
+This project is licensed under the [MIT License](LICENSE). The vendored `internal/docx` package keeps its original MIT license.
