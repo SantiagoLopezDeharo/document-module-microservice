@@ -230,6 +230,24 @@ func TestLargePayloads(t *testing.T) {
 	s.healthy(t)
 }
 
+// TestLargeXLSXOutput produces a worksheet beyond excelize's 16 MiB stream
+// chunk, which spills to a temporary file and so needs a writable temp dir.
+func TestLargeXLSXOutput(t *testing.T) {
+	s := startServer(t)
+	var csv bytes.Buffer
+	csv.WriteString("id,name,email,amount,country\n")
+	rows := 0
+	for csv.Len() < 12<<20 {
+		rows++
+		fmt.Fprintf(&csv, "%d,User %d,user%d@example.com,%d.5,UY\n", rows, rows, rows, rows)
+	}
+	xlsx := s.mustConvert(t, "csv", "xlsx", csv.Bytes())
+	back := asRecords(t, s.mustConvert(t, "xlsx", "json", xlsx))
+	if len(back) != rows {
+		t.Fatalf("records = %d, want %d", len(back), rows)
+	}
+}
+
 func TestGeneratedPDF(t *testing.T) {
 	s := startServer(t)
 	var actions []string
