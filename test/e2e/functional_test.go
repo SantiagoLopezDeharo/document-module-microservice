@@ -312,20 +312,29 @@ func TestGeneratedXLSX(t *testing.T) {
 
 func zipFile(t *testing.T, archive []byte, name string) []byte {
 	t.Helper()
+	data, err := readZipEntry(archive, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+func readZipEntry(archive []byte, name string) ([]byte, error) {
 	r, err := zip.NewReader(bytes.NewReader(archive), int64(len(archive)))
 	if err != nil {
-		t.Fatalf("not a zip archive: %v", err)
+		return nil, fmt.Errorf("not a zip archive: %w", err)
 	}
 	for _, f := range r.File {
 		if f.Name == name {
-			rc, _ := f.Open()
+			rc, err := f.Open()
+			if err != nil {
+				return nil, err
+			}
 			defer rc.Close()
-			data, _ := io.ReadAll(rc)
-			return data
+			return io.ReadAll(rc)
 		}
 	}
-	t.Fatalf("archive lacks %s", name)
-	return nil
+	return nil, fmt.Errorf("archive lacks %s", name)
 }
 
 func TestGracefulShutdownFinishesInFlightRequests(t *testing.T) {
