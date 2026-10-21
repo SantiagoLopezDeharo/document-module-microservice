@@ -274,7 +274,7 @@ The workbook starts with one sheet, `Sheet1`.
 | `SetColWidth` | `sheet`, `start_col`, `end_col`, `width` |
 | `SetRowHeight` | `sheet`, `row`, `height` |
 | `MergeCell` | `sheet`, `h_cell`, `v_cell` (opposite corners) |
-| `NewStyle` | `style` (excelize [`Style`](https://pkg.go.dev/github.com/xuri/excelize/v2#Style), e.g. `font`, `fill`, `border`, `alignment`), optional `style_ref` name |
+| `NewStyle` | `style` (excelize [`Style`](https://pkg.go.dev/github.com/xuri/excelize/v2#Style), e.g. `font`, `fill`, `border`, `alignment`, `num_fmt`), optional `style_ref` name |
 | `SetCellStyle` | `sheet`, `h_cell`, `v_cell`, and `style_ref` or `style_id` |
 
 ```shell
@@ -297,6 +297,8 @@ curl -X POST http://localhost:8080/convert/xlsx -o sales.xlsx -d '{
   ]
 }'
 ```
+
+Style keys are the excelize field names in `snake_case` at every level (`num_fmt`, `custom_num_fmt`, `wrap_text`, `shrink_to_fit`, `vert_align`). The Go spellings (`NumFmt`) and their lowercase form (`numfmt`) are accepted too.
 
 ### Status codes
 

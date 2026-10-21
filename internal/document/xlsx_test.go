@@ -86,6 +86,57 @@ func splitRef(ref string) (string, string) {
 	return "", ref
 }
 
+func TestRenderXLSXStyleAcceptsSnakeCaseAndGoFieldNames(t *testing.T) {
+	spellings := map[string]string{
+		"snake_case": `{"num_fmt":3,"font":{"bold":true,"vert_align":"superscript"},"alignment":{"wrap_text":true,"horizontal":"center","shrink_to_fit":true,"text_rotation":45},"protection":{"hidden":true}}`,
+		"go names":   `{"NumFmt":3,"Font":{"Bold":true,"VertAlign":"superscript"},"Alignment":{"WrapText":true,"Horizontal":"center","ShrinkToFit":true,"TextRotation":45},"Protection":{"Hidden":true}}`,
+		"lowercase":  `{"numfmt":3,"font":{"bold":true,"vertalign":"superscript"},"alignment":{"wraptext":true,"horizontal":"center","shrinktofit":true,"textrotation":45},"protection":{"hidden":true}}`,
+	}
+	for name, style := range spellings {
+		t.Run(name, func(t *testing.T) {
+			f := renderAndOpen(t, `{"actions":[
+				{"type":"NewStyle","style_ref":"s","style":`+style+`},
+				{"type":"SetCellStyle","sheet":"Sheet1","h_cell":"A1","v_cell":"A1","style_ref":"s"}
+			]}`)
+			id, _ := f.GetCellStyle("Sheet1", "A1")
+			got, err := f.GetStyle(id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.NumFmt != 3 {
+				t.Errorf("number format = %d, want 3", got.NumFmt)
+			}
+			if got.Font == nil || !got.Font.Bold || got.Font.VertAlign != "superscript" {
+				t.Errorf("font = %+v", got.Font)
+			}
+			if a := got.Alignment; a == nil || !a.WrapText || a.Horizontal != "center" || !a.ShrinkToFit || a.TextRotation != 45 {
+				t.Errorf("alignment = %+v", got.Alignment)
+			}
+			if got.Protection == nil || !got.Protection.Hidden {
+				t.Errorf("protection = %+v", got.Protection)
+			}
+		})
+	}
+}
+
+func TestRenderXLSXStyleKeepsNestedListsAndCustomFormats(t *testing.T) {
+	f := renderAndOpen(t, `{"actions":[
+		{"type":"NewStyle","style_ref":"s","style":{"custom_num_fmt":"0.0%","border":[{"type":"left","style":1,"color":"#000000"}],"fill":{"type":"pattern","pattern":1,"color":["#FF0000"]}}},
+		{"type":"SetCellStyle","sheet":"Sheet1","h_cell":"A1","v_cell":"A1","style_ref":"s"}
+	]}`)
+	id, _ := f.GetCellStyle("Sheet1", "A1")
+	got, err := f.GetStyle(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.CustomNumFmt == nil || *got.CustomNumFmt != "0.0%" {
+		t.Errorf("custom number format = %v", got.CustomNumFmt)
+	}
+	if len(got.Border) != 1 || got.Border[0].Type != "left" || got.Fill.Pattern != 1 || len(got.Fill.Color) != 1 {
+		t.Errorf("border = %+v, fill = %+v", got.Border, got.Fill)
+	}
+}
+
 func TestRenderXLSXStyleByID(t *testing.T) {
 	f := renderAndOpen(t, `{"actions":[
 		{"type":"NewStyle","style":{"font":{"italic":true}}},

@@ -23,9 +23,9 @@ type XLSXAction struct {
 	HCell    string      `json:"h_cell,omitempty"`
 	VCell    string      `json:"v_cell,omitempty"`
 
-	Style    *excelize.Style `json:"style,omitempty"`
-	StyleID  int             `json:"style_id,omitempty"`
-	StyleRef string          `json:"style_ref,omitempty"`
+	Style    *xlsxStyle `json:"style,omitempty"`
+	StyleID  int        `json:"style_id,omitempty"`
+	StyleRef string     `json:"style_ref,omitempty"`
 }
 
 type XLSXRequest struct {
@@ -97,7 +97,7 @@ func (wb *workbook) apply(a XLSXAction) error {
 		if a.Style == nil {
 			return errMissingStyle
 		}
-		id, err := f.NewStyle(a.Style)
+		id, err := f.NewStyle((*excelize.Style)(a.Style))
 		if err == nil && a.StyleRef != "" {
 			wb.styles[a.StyleRef] = id
 		}
