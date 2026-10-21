@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -13,8 +14,8 @@ type csvCodec struct {
 	comma rune
 }
 
-func (c *csvCodec) Decode(r io.Reader) (interface{}, error) {
-	reader := csv.NewReader(r)
+func (c *csvCodec) Decode(data []byte) (interface{}, error) {
+	reader := csv.NewReader(bytes.NewReader(data))
 	reader.Comma = c.comma
 	reader.ReuseRecord = true
 

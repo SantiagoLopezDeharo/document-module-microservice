@@ -12,7 +12,7 @@ func TestYAMLCodec(t *testing.T) {
 	codec := &yamlCodec{}
 	input := "a: 1\nb: test\n"
 
-	decoded, err := codec.Decode(strings.NewReader(input))
+	decoded, err := codec.Decode([]byte(input))
 	if err != nil {
 		t.Fatalf("Decode failed: %v", err)
 	}
@@ -34,7 +34,7 @@ func TestMsgPackCodec(t *testing.T) {
 		t.Fatalf("Encode failed: %v", err)
 	}
 
-	decoded, err := codec.Decode(&buf)
+	decoded, err := codec.Decode(buf.Bytes())
 	if err != nil {
 		t.Fatalf("Decode failed: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestPropertiesCodec(t *testing.T) {
 	codec := &propertiesCodec{}
 	input := "key=value\nnested.key=value2\n"
 
-	decoded, err := codec.Decode(strings.NewReader(input))
+	decoded, err := codec.Decode([]byte(input))
 	if err != nil {
 		t.Fatalf("Decode failed: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestXLSXCodec(t *testing.T) {
 		t.Fatalf("Encode failed: %v", err)
 	}
 
-	decoded, err := codec.Decode(&buf)
+	decoded, err := codec.Decode(buf.Bytes())
 	if err != nil {
 		t.Fatalf("Decode failed: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestNewFormatsRoundTrip(t *testing.T) {
 					t.Fatalf("Encode %s failed: %v", from, err)
 				}
 
-				decoded, err := fromCodec.Decode(&buf1)
+				decoded, err := fromCodec.Decode(buf1.Bytes())
 				if err != nil {
 					t.Fatalf("Decode %s failed: %v", from, err)
 				}

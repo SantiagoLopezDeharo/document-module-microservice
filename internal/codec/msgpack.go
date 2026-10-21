@@ -8,19 +8,15 @@ import (
 
 type msgpackCodec struct{}
 
-func (c *msgpackCodec) Decode(r io.Reader) (interface{}, error) {
-	b, err := io.ReadAll(r)
-	if err != nil {
+func (c *msgpackCodec) Decode(data []byte) (interface{}, error) {
+	if err := checkMsgpack(data); err != nil {
 		return nil, err
 	}
-	if err := checkMsgpack(b); err != nil {
+	var value interface{}
+	if err := msgpack.Unmarshal(data, &value); err != nil {
 		return nil, err
 	}
-	var data interface{}
-	if err := msgpack.Unmarshal(b, &data); err != nil {
-		return nil, err
-	}
-	return data, nil
+	return value, nil
 }
 
 func (c *msgpackCodec) Encode(w io.Writer, data interface{}) error {

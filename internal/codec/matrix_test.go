@@ -210,7 +210,7 @@ func TestMatrixConversions(t *testing.T) {
 
 						// 2. Decode Input Format to Intermediate Data
 						// We need a fresh reader
-						decodedIntermediate, err := inputCodec.Decode(bytes.NewReader(inputBuf.Bytes()))
+						decodedIntermediate, err := inputCodec.Decode(inputBuf.Bytes())
 						if err != nil {
 							t.Fatalf("Failed to decode from %s: %v", inputFmt, err)
 						}
@@ -235,7 +235,7 @@ func TestMatrixConversions(t *testing.T) {
 						}
 
 						// 4. Decode Output Format to Final Data
-						finalData, err := outputCodec.Decode(bytes.NewReader(outputBuf.Bytes()))
+						finalData, err := outputCodec.Decode(outputBuf.Bytes())
 						if err != nil {
 							if isKnownLimitation(inputFmt, outputFmt, scenario.Name) {
 								t.Logf("Skipping known limitation (decoding failed) for %s -> %s: %v", inputFmt, outputFmt, err)

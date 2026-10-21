@@ -15,7 +15,7 @@ func decodeString(t *testing.T, format models.Format, input string) (interface{}
 	if err != nil {
 		t.Fatal(err)
 	}
-	return c.Decode(strings.NewReader(input))
+	return c.Decode([]byte(input))
 }
 
 func encodeString(t *testing.T, format models.Format, data interface{}) string {
@@ -138,7 +138,7 @@ func fuzzDecoder(f *testing.F, format models.Format, seeds ...string) {
 	c, _ := GetCodec(format)
 	json, _ := GetCodec(models.FormatJSON)
 	f.Fuzz(func(t *testing.T, data []byte) {
-		decoded, err := c.Decode(bytes.NewReader(data))
+		decoded, err := c.Decode(data)
 		if err != nil {
 			return
 		}

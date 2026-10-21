@@ -255,7 +255,7 @@ func TestRenderErrorHidesInternalFailures(t *testing.T) {
 	failing := func(document.PDFRequest, document.Limits) ([]byte, error) {
 		return nil, errors.New("disk /var/secret exploded")
 	}
-	rec := serve(t, documentHandler(failing, document.Limits{}, contentTypePDF, "x.pdf"), call{method: http.MethodPost, target: "/", body: []byte(`{}`)})
+	rec := serve(t, guarded(1<<20, 1)(documentHandler(failing, document.Limits{}, contentTypePDF, "x.pdf")), call{method: http.MethodPost, target: "/", body: []byte(`{}`)})
 	if rec.Code != http.StatusInternalServerError || strings.Contains(rec.Body.String(), "secret") {
 		t.Fatalf("status %d body %q", rec.Code, rec.Body)
 	}
@@ -265,7 +265,7 @@ func TestGuardedLimitsConcurrency(t *testing.T) {
 	const limit = 3
 	var active, peak atomic.Int64
 	release := make(chan struct{})
-	slow := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	slow := bodyHandler(func(w http.ResponseWriter, r *http.Request, _ []byte) {
 		n := active.Add(1)
 		for {
 			p := peak.Load()
@@ -295,7 +295,7 @@ func TestGuardedLimitsConcurrency(t *testing.T) {
 
 func TestGuardedAbandonsCancelledWaiters(t *testing.T) {
 	block := make(chan struct{})
-	h := guarded(1<<20, 1)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { <-block }))
+	h := guarded(1<<20, 1)(func(http.ResponseWriter, *http.Request, []byte) { <-block })
 	go serve(t, h, call{method: http.MethodPost, target: "/"})
 	time.Sleep(20 * time.Millisecond)
 
@@ -316,7 +316,7 @@ func TestGuardedAbandonsCancelledWaiters(t *testing.T) {
 }
 
 func TestGuardedCapsBody(t *testing.T) {
-	h := guarded(10, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	h := guarded(10, 1)(func(http.ResponseWriter, *http.Request, []byte) {})
 	if rec := serve(t, h, call{method: http.MethodPost, target: "/", body: []byte("01234567890")}); rec.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("status %d", rec.Code)
 	}
@@ -347,9 +347,9 @@ func BenchmarkConvertJSONToCSV(b *testing.B) {
 }
 
 func TestGuardedDoesNotHoldSlotsWhileReceivingBodies(t *testing.T) {
-	h := guarded(1<<20, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.Copy(w, r.Body)
-	}))
+	h := guarded(1<<20, 1)(func(w http.ResponseWriter, _ *http.Request, body []byte) {
+		_, _ = w.Write(body)
+	})
 
 	slowBody, feed := io.Pipe()
 	slowDone := make(chan *httptest.ResponseRecorder)

@@ -115,7 +115,7 @@ func runConversionBenchmark(b *testing.B, data interface{}, inputFmt, outputFmt 
 			b.Fatalf("encode failed for %s: %v", inputFmt, err)
 		}
 
-		decoded, err := inputCodec.Decode(bytes.NewReader(encodeBuf.Bytes()))
+		decoded, err := inputCodec.Decode(encodeBuf.Bytes())
 		if err != nil {
 			b.Fatalf("decode failed for %s: %v", inputFmt, err)
 		}

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/SantiagoLopezDeharo/document-module-microservice/internal/codec"
 )
@@ -21,7 +20,7 @@ func main() {
 </doc>`
 
 	c, _ := codec.GetCodec("XML")
-	res, err := c.Decode(strings.NewReader(xmlStr))
+	res, err := c.Decode([]byte(xmlStr))
 	if err != nil {
 		fmt.Println("Error:", err)
 		return

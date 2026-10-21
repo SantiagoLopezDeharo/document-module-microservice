@@ -17,14 +17,7 @@ const (
 
 type propertiesCodec struct{}
 
-func (c *propertiesCodec) Decode(r io.Reader) (interface{}, error) {
-	// Properties library expects a string or byte slice, or loading from file.
-	// We'll read all from reader.
-	buf, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
+func (c *propertiesCodec) Decode(buf []byte) (interface{}, error) {
 	// Expansion stays disabled: ${...} is data to convert, and expanding it made
 	// a circular reference call log.Fatal and terminate the server.
 	loader := properties.Loader{Encoding: properties.UTF8, DisableExpansion: true}

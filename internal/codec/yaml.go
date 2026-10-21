@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"bytes"
 	"io"
 
 	"gopkg.in/yaml.v3"
@@ -8,12 +9,12 @@ import (
 
 type yamlCodec struct{}
 
-func (c *yamlCodec) Decode(r io.Reader) (interface{}, error) {
-	var data interface{}
-	if err := yaml.NewDecoder(r).Decode(&data); err != nil {
+func (c *yamlCodec) Decode(data []byte) (interface{}, error) {
+	var value interface{}
+	if err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&value); err != nil {
 		return nil, err
 	}
-	return data, nil
+	return value, nil
 }
 
 func (c *yamlCodec) Encode(w io.Writer, data interface{}) error {

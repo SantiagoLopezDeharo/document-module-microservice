@@ -15,10 +15,10 @@ const (
 
 type renderer[T any] func(T, document.Limits) ([]byte, error)
 
-func documentHandler[T any](render renderer[T], limits document.Limits, contentType, filename string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func documentHandler[T any](render renderer[T], limits document.Limits, contentType, filename string) bodyHandler {
+	return func(w http.ResponseWriter, r *http.Request, body []byte) {
 		var req T
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.Unmarshal(body, &req); err != nil {
 			clientError(w, "Invalid JSON", err)
 			return
 		}

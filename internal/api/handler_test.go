@@ -139,7 +139,7 @@ func TestComplexConversion(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/convert?input=json&output=csv", bytes.NewBufferString(jsonInput))
 	w := httptest.NewRecorder()
-	convertHandler(w, req)
+	testRouter(t).ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("Expected status 200, got %d", w.Code)

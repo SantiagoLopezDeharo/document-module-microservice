@@ -52,8 +52,7 @@ func BenchmarkCodecs(b *testing.B) {
 		b.Run("Decode_"+string(f), func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				reader := bytes.NewReader(inputBytes)
-				if _, err := c.Decode(reader); err != nil {
+				if _, err := c.Decode(inputBytes); err != nil {
 					b.Fatal(err)
 				}
 			}

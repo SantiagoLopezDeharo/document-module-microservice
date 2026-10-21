@@ -39,7 +39,7 @@ func TestDecodeRejectsPathologicalNesting(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = c.Decode(strings.NewReader(nested(format, 1_000_000)))
+			_, err = c.Decode([]byte(nested(format, 1_000_000)))
 			if err == nil {
 				t.Fatal("million-level nesting accepted")
 			}
@@ -54,7 +54,7 @@ func TestDecodeAcceptsReasonableNesting(t *testing.T) {
 	for _, format := range nestableFormats {
 		t.Run(string(format), func(t *testing.T) {
 			c, _ := GetCodec(format)
-			if _, err := c.Decode(strings.NewReader(nested(format, 500))); err != nil {
+			if _, err := c.Decode([]byte(nested(format, 500))); err != nil {
 				t.Fatalf("500 levels rejected: %v", err)
 			}
 		})

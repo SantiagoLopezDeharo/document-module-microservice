@@ -42,7 +42,7 @@ func TestJSONCodec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			decoded, err := codec.Decode(strings.NewReader(tt.input))
+			decoded, err := codec.Decode([]byte(tt.input))
 			if err != nil {
 				t.Fatalf("Decode failed: %v", err)
 			}
@@ -53,7 +53,7 @@ func TestJSONCodec(t *testing.T) {
 				t.Fatalf("Encode failed: %v", err)
 			}
 
-			decoded2, err := codec.Decode(&buf)
+			decoded2, err := codec.Decode(buf.Bytes())
 			if err != nil {
 				t.Fatalf("Second decode failed: %v", err)
 			}
@@ -84,7 +84,7 @@ func TestXMLCodec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			decoded, err := codec.Decode(strings.NewReader(tt.input))
+			decoded, err := codec.Decode([]byte(tt.input))
 			if err != nil {
 				t.Fatalf("Decode failed: %v", err)
 			}
@@ -121,7 +121,7 @@ func TestCSVCodec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			decoded, err := codec.Decode(strings.NewReader(tt.input))
+			decoded, err := codec.Decode([]byte(tt.input))
 			if err != nil {
 				t.Fatalf("Decode failed: %v", err)
 			}
@@ -140,7 +140,7 @@ func TestTSVCodec(t *testing.T) {
 
 	input := "a\tb\n1\t2\n3\t4\n"
 
-	decoded, err := codec.Decode(strings.NewReader(input))
+	decoded, err := codec.Decode([]byte(input))
 	if err != nil {
 		t.Fatalf("Decode failed: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestTOMLCodec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			decoded, err := codec.Decode(strings.NewReader(tt.input))
+			decoded, err := codec.Decode([]byte(tt.input))
 			if err != nil {
 				t.Fatalf("Decode failed: %v", err)
 			}
@@ -221,7 +221,7 @@ func TestConversionRoundTrips(t *testing.T) {
 					t.Fatalf("Failed to encode to %s: %v", fromFormat, err)
 				}
 
-				decoded, err := fromCodec.Decode(&buf1)
+				decoded, err := fromCodec.Decode(buf1.Bytes())
 				if err != nil {
 					t.Fatalf("Failed to decode from %s: %v", fromFormat, err)
 				}
@@ -232,7 +232,7 @@ func TestConversionRoundTrips(t *testing.T) {
 					t.Fatalf("Failed to encode to %s: %v", toFormat, err)
 				}
 
-				_, err = toCodec.Decode(&buf2)
+				_, err = toCodec.Decode(buf2.Bytes())
 				if err != nil {
 					t.Fatalf("Failed to decode from %s: %v", toFormat, err)
 				}
@@ -261,7 +261,7 @@ func TestConversionRoundTrips(t *testing.T) {
 				t.Fatalf("Failed to encode to %s: %v", test.from, err)
 			}
 
-			decoded, err := fromCodec.Decode(&buf1)
+			decoded, err := fromCodec.Decode(buf1.Bytes())
 			if err != nil {
 				t.Fatalf("Failed to decode from %s: %v", test.from, err)
 			}
@@ -308,7 +308,7 @@ func TestComplexStructures(t *testing.T) {
 		t.Fatalf("Failed to encode complex data: %v", err)
 	}
 
-	decoded, err := jsonCodec.Decode(&buf)
+	decoded, err := jsonCodec.Decode(buf.Bytes())
 	if err != nil {
 		t.Fatalf("Failed to decode complex data: %v", err)
 	}

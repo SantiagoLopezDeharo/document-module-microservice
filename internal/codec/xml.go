@@ -65,11 +65,7 @@ func isXMLName(name string) bool {
 	return true
 }
 
-func (c *xmlCodec) Decode(r io.Reader) (interface{}, error) {
-	b, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
+func (c *xmlCodec) Decode(b []byte) (interface{}, error) {
 	if err := checkXMLDepth(b); err != nil {
 		return nil, err
 	}

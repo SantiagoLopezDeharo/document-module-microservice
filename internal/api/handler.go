@@ -10,7 +10,7 @@ import (
 	"github.com/SantiagoLopezDeharo/document-module-microservice/internal/utils"
 )
 
-func convertHandler(w http.ResponseWriter, r *http.Request) {
+func convertHandler(w http.ResponseWriter, r *http.Request, body []byte) {
 	inputFormat := parseInputFormat(r)
 	outputFormat := parseOutputFormat(r)
 
@@ -31,7 +31,7 @@ func convertHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := decoder.Decode(r.Body)
+	data, err := decoder.Decode(body)
 	if err != nil {
 		clientError(w, "Decode error", err)
 		return

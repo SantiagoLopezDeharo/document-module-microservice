@@ -9,11 +9,7 @@ import (
 
 type tomlCodec struct{}
 
-func (c *tomlCodec) Decode(r io.Reader) (interface{}, error) {
-	b, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
+func (c *tomlCodec) Decode(b []byte) (interface{}, error) {
 	if err := checkTOMLDepth(b); err != nil {
 		return nil, err
 	}

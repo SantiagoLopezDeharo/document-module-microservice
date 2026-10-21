@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 
@@ -19,8 +20,8 @@ const (
 	maxUnzipXMLBytes = maxUnzipBytes
 )
 
-func (c *xlsxCodec) Decode(r io.Reader) (interface{}, error) {
-	f, err := excelize.OpenReader(r, excelize.Options{
+func (c *xlsxCodec) Decode(data []byte) (interface{}, error) {
+	f, err := excelize.OpenReader(bytes.NewReader(data), excelize.Options{
 		UnzipSizeLimit:    maxUnzipBytes,
 		UnzipXMLSizeLimit: maxUnzipXMLBytes,
 	})

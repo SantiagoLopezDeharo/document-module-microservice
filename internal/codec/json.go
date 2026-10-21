@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -12,17 +13,17 @@ type jsonCodec struct{}
 
 var errTrailingJSON = errors.New("unexpected data after the JSON document")
 
-func (c *jsonCodec) Decode(r io.Reader) (interface{}, error) {
-	dec := json.NewDecoder(r)
+func (c *jsonCodec) Decode(data []byte) (interface{}, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
-	var data interface{}
-	if err := dec.Decode(&data); err != nil {
+	var value interface{}
+	if err := dec.Decode(&value); err != nil {
 		return nil, err
 	}
 	if _, err := dec.Token(); err != io.EOF {
 		return nil, errTrailingJSON
 	}
-	return normalizeNumbers(data), nil
+	return normalizeNumbers(value), nil
 }
 
 func (c *jsonCodec) Encode(w io.Writer, data interface{}) error {
