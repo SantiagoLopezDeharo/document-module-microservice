@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -18,4 +19,8 @@ func testConfig(t testing.TB, overrides map[string]string) *config.Config {
 
 func testRouter(t testing.TB) http.Handler {
 	return NewRouter(testConfig(t, nil))
+}
+
+func contextWithCancel(r *http.Request) (context.Context, context.CancelFunc) {
+	return context.WithCancel(r.Context())
 }

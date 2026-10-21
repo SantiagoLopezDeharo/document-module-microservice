@@ -11,7 +11,7 @@ import (
 func TestYAMLCodec(t *testing.T) {
 	codec := &yamlCodec{}
 	input := "a: 1\nb: test\n"
-	
+
 	decoded, err := codec.Decode(strings.NewReader(input))
 	if err != nil {
 		t.Fatalf("Decode failed: %v", err)
@@ -38,7 +38,7 @@ func TestMsgPackCodec(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Decode failed: %v", err)
 	}
-	
+
 	// MsgPack decodes numbers as int8/int64 etc, JSON as float64.
 	// We just check if it's not nil for now.
 	if decoded == nil {
@@ -60,7 +60,7 @@ func TestPropertiesCodec(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Encode failed: %v", err)
 	}
-	
+
 	output := buf.String()
 	if !strings.Contains(output, "key=value") {
 		t.Errorf("Expected output to contain key=value, got %s", output)
