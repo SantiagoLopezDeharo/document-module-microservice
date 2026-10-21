@@ -177,6 +177,27 @@ func TestLargeIntegersSurviveEveryFormat(t *testing.T) {
 	}
 }
 
+func TestIntegersAreNotWrittenAsFloats(t *testing.T) {
+	s := startServer(t)
+	toml := s.mustConvert(t, "json", "toml", []byte(`{"port":8080,"ratio":0.5}`))
+	if !bytes.Contains(toml, []byte("port = 8080\n")) || !bytes.Contains(toml, []byte("ratio = 0.5\n")) {
+		t.Errorf("TOML = %s", toml)
+	}
+	pack := s.mustConvert(t, "json", "msgpack", []byte(`{"port":8080}`))
+	if bytes.Contains(pack, []byte{0xcb}) {
+		t.Errorf("MessagePack encodes the integer as a float64: %x", pack)
+	}
+}
+
+func TestTabularOutputKeepsDottedKeysAndWritesArraysAsJSON(t *testing.T) {
+	s := startServer(t)
+	csv := s.mustConvert(t, "json", "csv", []byte(`[{"a.b":1,"tags":["x","y"],"user":{"name":"Ada"}}]`))
+	want := "a.b,tags,user.name\n1,\"[\"\"x\"\",\"\"y\"\"]\",Ada\n"
+	if string(csv) != want {
+		t.Errorf("CSV = %q, want %q", csv, want)
+	}
+}
+
 func TestFormatNegotiationByHeaders(t *testing.T) {
 	s := startServer(t)
 	mimes := map[string]string{
@@ -275,6 +296,24 @@ func TestGeneratedPDF(t *testing.T) {
 	}
 	if res.header.Get("Content-Disposition") != "attachment; filename=output.pdf" {
 		t.Errorf("Content-Disposition %q", res.header.Get("Content-Disposition"))
+	}
+}
+
+func TestGeneratedPDFRendersUTF8Text(t *testing.T) {
+	pdftotext, err := exec.LookPath("pdftotext")
+	if err != nil {
+		t.Skip("pdftotext not installed")
+	}
+	s := startServer(t)
+	res := s.generate(t, "pdf", `{"actions":[{"type":"AddPage"},{"type":"SetFont","family":"Arial","size":12},{"type":"SetFillColor","r":255,"g":0,"b":0},{"type":"Cell","w":60,"h":10,"txt":"Café €","fill":true}]}`)
+	if res.status != http.StatusOK {
+		t.Fatalf("status %d %s", res.status, res.body)
+	}
+	cmd := exec.Command(pdftotext, "-", "-")
+	cmd.Stdin = bytes.NewReader(res.body)
+	text, err := cmd.Output()
+	if err != nil || !strings.Contains(string(text), "Café €") {
+		t.Errorf("extracted text %q, err %v", text, err)
 	}
 }
 
