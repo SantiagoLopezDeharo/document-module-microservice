@@ -9,7 +9,7 @@ require (
 	github.com/magiconair/properties v1.18.12
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/vmihailenco/msgpack/v5 v5.4.1
-	github.com/xuri/excelize/v2 v2.11.0
+	github.com/xuri/excelize/v2 v2.11.1-0.20261020033641-611b222fd8f7
 	gopkg.in/yaml.v3 v3.0.1
 )
 
