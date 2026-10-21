@@ -83,8 +83,8 @@ func unflattenProperties(flat map[string]string) map[string]interface{} {
 }
 
 func parseValue(v string) interface{} {
-	if i, err := strconv.Atoi(v); err == nil {
-		return float64(i) // Use float64 to match JSON/YAML default decoding for numbers
+	if i, err := strconv.ParseInt(v, 10, 64); err == nil {
+		return i
 	}
 	if f, err := strconv.ParseFloat(v, 64); err == nil {
 		return f

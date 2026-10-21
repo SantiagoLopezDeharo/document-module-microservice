@@ -35,11 +35,11 @@ func TestJSONPreservesLargeIntegers(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]interface{}{
-		"small": float64(42),
-		"neg":   float64(-7),
+		"small": int64(42),
+		"neg":   int64(-7),
 		"float": 1.5,
 		"exp":   float64(1000),
-		"limit": float64(9007199254740992),
+		"limit": int64(9007199254740992),
 		"over":  int64(9007199254740993),
 		"under": int64(-9007199254740993),
 		"max":   int64(9223372036854775807),
@@ -71,7 +71,7 @@ func TestJSONNormalizesNestedNumbers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []interface{}{map[string]interface{}{"a": []interface{}{float64(1), map[string]interface{}{"b": int64(9007199254740995)}}}}
+	want := []interface{}{map[string]interface{}{"a": []interface{}{int64(1), map[string]interface{}{"b": int64(9007199254740995)}}}}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("(-want +got):\n%s", diff)
 	}

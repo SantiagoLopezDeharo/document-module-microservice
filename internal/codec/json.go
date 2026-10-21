@@ -46,10 +46,11 @@ func (c *jsonCodec) Encode(w io.Writer, data interface{}) error {
 	return err
 }
 
-// normalizeNumbers keeps numbers as float64, like the default decoder, except
-// integers that float64 cannot represent exactly, which become int64 or uint64
-// so identifiers such as 9007199254740993 survive conversion. Numbers outside
-// the float64 range are rejected, as encoding/json does.
+// normalizeNumbers turns integer literals into int64 (uint64 above the int64
+// range) so they stay integers in formats that distinguish them, such as TOML
+// and MsgPack, and identifiers such as 9007199254740993 survive conversion.
+// Other numbers become float64. Numbers outside the float64 range are
+// rejected, as encoding/json does.
 func normalizeNumbers(v interface{}) (interface{}, error) {
 	var err error
 	switch val := v.(type) {
@@ -71,15 +72,10 @@ func normalizeNumbers(v interface{}) (interface{}, error) {
 	return v, nil
 }
 
-const maxExactFloatInt = 1 << 53
-
 func jsonNumber(s string) (interface{}, error) {
 	if !strings.ContainsAny(s, ".eE") {
 		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			if i > maxExactFloatInt || i < -maxExactFloatInt {
-				return i, nil
-			}
-			return float64(i), nil
+			return i, nil
 		}
 		if u, err := strconv.ParseUint(s, 10, 64); err == nil {
 			return u, nil
