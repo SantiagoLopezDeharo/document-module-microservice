@@ -316,11 +316,7 @@ func TestGuardedAbandonsCancelledWaiters(t *testing.T) {
 }
 
 func TestGuardedCapsBody(t *testing.T) {
-	h := guarded(10, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, err := io.ReadAll(r.Body); err != nil {
-			clientError(w, "read", err)
-		}
-	}))
+	h := guarded(10, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	if rec := serve(t, h, call{method: http.MethodPost, target: "/", body: []byte("01234567890")}); rec.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("status %d", rec.Code)
 	}
@@ -347,5 +343,38 @@ func BenchmarkConvertJSONToCSV(b *testing.B) {
 		if rec := serve(b, router, call{method: http.MethodPost, target: "/convert?input=json&output=csv", body: payload}); rec.Code != 200 {
 			b.Fatal(rec.Code)
 		}
+	}
+}
+
+func TestGuardedDoesNotHoldSlotsWhileReceivingBodies(t *testing.T) {
+	h := guarded(1<<20, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(w, r.Body)
+	}))
+
+	slowBody, feed := io.Pipe()
+	slowDone := make(chan *httptest.ResponseRecorder)
+	go func() {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/", slowBody))
+		slowDone <- rec
+	}()
+	_, _ = feed.Write([]byte("partial "))
+	time.Sleep(50 * time.Millisecond)
+
+	fast := make(chan int)
+	go func() { fast <- serve(t, h, call{method: http.MethodPost, target: "/", body: []byte("quick")}).Code }()
+	select {
+	case code := <-fast:
+		if code != http.StatusOK {
+			t.Errorf("fast request status %d", code)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("a client still uploading its body holds the only processing slot")
+	}
+
+	_, _ = feed.Write([]byte("body"))
+	_ = feed.Close()
+	if rec := <-slowDone; rec.Body.String() != "partial body" {
+		t.Errorf("slow request body = %q", rec.Body)
 	}
 }

@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 
 	"github.com/SantiagoLopezDeharo/document-module-microservice/internal/config"
@@ -23,19 +25,25 @@ func NewRouter(cfg *config.Config) http.Handler {
 	return mux
 }
 
-// guarded caps request bodies and the number of requests processed at once;
-// conversions are CPU and memory bound, so excess requests wait their turn.
+// guarded caps request bodies and the number of requests processed at once.
+// Bodies are received before taking a slot, so clients that upload slowly
+// cannot occupy the slots that bound CPU and memory spent on conversions.
 func guarded(maxBodyBytes int64, maxConcurrent int) func(http.Handler) http.Handler {
 	slots := make(chan struct{}, maxConcurrent)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+			if err != nil {
+				clientError(w, "Error reading body", err)
+				return
+			}
 			select {
 			case slots <- struct{}{}:
 				defer func() { <-slots }()
 			case <-r.Context().Done():
 				return
 			}
-			r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+			r.Body = io.NopCloser(bytes.NewReader(body))
 			next.ServeHTTP(w, r)
 		})
 	}
